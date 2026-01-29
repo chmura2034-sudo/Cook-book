@@ -1,0 +1,489 @@
+/* ------------------------------
+   MOTYWY
+--------------------------------*/
+:root {
+    --bg: #f4f4f4;
+    --text: #000;
+    --card-bg: #fff;
+}
+
+[data-theme="dark"] {
+    --bg: #1e1e1e;
+    --text: #fff;
+    --card-bg: #2c2c2c;
+}
+
+* {
+    transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* ------------------------------
+   LAYOUT GLOBALNY
+--------------------------------*/
+body {
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+/* Karta */
+.card {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    text-align: center;
+    width: 350px;
+}
+
+/* ------------------------------
+   FORMULARZE
+--------------------------------*/
+input {
+    width: 90%;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+    background: var(--card-bg);
+    color: var(--text);
+}
+
+/* ------------------------------
+   PRZYCISKI
+--------------------------------*/
+.btn {
+    padding: 10px 20px;
+    background: #007bff;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 10px;
+}
+
+.btn:hover {
+    background: #0056b3;
+}
+
+/* ------------------------------
+   SUWAK MOTYWU
+--------------------------------*/
+.theme-toggle {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.switch {
+    position: relative;
+    width: 60px;
+    height: 30px;
+}
+
+.switch input {
+    display: none;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    background: #ccc;
+    border-radius: 30px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: 0.4s;
+}
+
+.slider:before {
+    content: "";
+    position: absolute;
+    height: 24px;
+    width: 24px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.4s;
+}
+
+input:checked + .slider {
+    background: #007bff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(30px);
+}
+
+/* ------------------------------
+   LINKI
+--------------------------------*/
+a {
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: #007bff;
+}
+
+/* ------------------------------
+   PANEL UŻYTKOWNIKA
+--------------------------------*/
+.main-container {
+    width: 800px;
+    margin: 40px auto;
+    background: var(--card-bg);
+    border-radius: 20px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+
+.tab-bar {
+    display: flex;
+    justify-content: space-around;
+    background: var(--bg);
+    border-bottom: 1px solid #ccc;
+    padding: 10px 0;
+}
+
+.tab {
+    background: none;
+    border: none;
+    font-weight: bold;
+    font-size: 16px;
+    color: var(--text);
+    cursor: pointer;
+    padding: 10px 20px;
+    transition: 0.3s;
+}
+
+.tab:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.tab.active {
+    border-bottom: 3px solid #007bff;
+    color: #007bff;
+}
+
+.tab-body {
+    padding: 30px;
+    background: var(--card-bg);
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+/* Friends layout */
+.friends-layout {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.friends-column {
+    flex: 1;
+    min-width: 300px;
+}
+
+.card-section {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.friend-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.friend-list li {
+    margin-bottom: 10px;
+}
+
+/* ------------------------------
+   ANIMACJA SŁOŃCA I KSIĘŻYCA
+--------------------------------*/
+.sky-wrapper {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 20px auto;
+    pointer-events: none;
+}
+
+.celestial {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    left: 50%;
+    top: 0%;
+    transform: translate(-50%, 0);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#sun {
+    filter: drop-shadow(0 0 25px rgba(255, 200, 0, 0.9));
+}
+
+#moon {
+    filter: drop-shadow(0 0 25px rgba(150, 150, 255, 0.9));
+}
+
+.orbit {
+    transform-origin: 50% 150px;
+}
+
+.sun-exit {
+    animation: sunOrbit 1.2s ease-in-out forwards;
+}
+
+@keyframes sunOrbit {
+    0% { transform: translate(-50%, 0) rotate(0deg); opacity: 1; }
+    50% { opacity: 0; }
+    100% { transform: translate(-50%, 0) rotate(180deg); opacity: 0; }
+}
+
+.moon-enter {
+    animation: moonOrbit 1.2s ease-in-out forwards;
+}
+
+@keyframes moonOrbit {
+    0% { transform: translate(-50%, 0) rotate(180deg); opacity: 0; }
+    50% { opacity: 0; }
+    100% { transform: translate(-50%, 0) rotate(360deg); opacity: 1; }
+}
+
+[data-theme="light"] #sun { opacity: 1; }
+[data-theme="light"] #moon { opacity: 0; }
+[data-theme="dark"] #sun { opacity: 0; }
+[data-theme="dark"] #moon { opacity: 1; }
+
+/* ------------------------------
+   RESPONSYWNOŚĆ
+--------------------------------*/
+
+/* Główne opakowanie */
+@media (max-width: 900px) {
+    .main-container {
+        width: 95%;
+        margin: 20px auto;
+    }
+    .tab-body {
+        padding: 20px;
+    }
+}
+
+/* Zakładki */
+@media (max-width: 750px) {
+    .tab-bar {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .tab {
+        flex: 1 1 45%;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .tab {
+        flex: 1 1 100%;
+        padding: 14px;
+        font-size: 16px;
+    }
+}
+
+/* Friends */
+@media (max-width: 800px) {
+    .friends-layout {
+        flex-direction: column;
+        gap: 20px;
+    }
+}
+
+/* Inputy i przyciski */
+@media (max-width: 600px) {
+    input, button, select, .btn {
+        width: 100%;
+        margin-top: 10px;
+        padding: 12px;
+        font-size: 16px;
+    }
+}
+
+/* Nagłówki */
+@media (max-width: 500px) {
+    h2, h3 {
+        font-size: 20px;
+        text-align: center;
+    }
+}
+
+/* Mini Games */
+@media (max-width: 450px) {
+    .friend-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+}
+
+/* Gry */
+@media (max-width: 420px) {
+    #board {
+        grid-template-columns: repeat(3, 70px);
+        grid-template-rows: repeat(3, 70px);
+    }
+    .cell {
+        font-size: 26px;
+    }
+}
+
+.friend-item {
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.friend-item:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.friend-profile {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+}
+
+.hidden {
+    display: none;
+}
+
+.profile-form input[type="text"] {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.profile-input {
+    width: 100%;
+}
+
+/* Etykieta nad suwakiem */
+.profile-label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
+
+.energy-wrapper {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.energy-label {
+    margin-bottom: 6px;
+    font-weight: bold;
+}
+
+.energy-select {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+    width: 100%;
+}
+
+.energy-box {
+    height: 22px;
+    border-radius: 4px;
+    background: #ccc;
+    cursor: pointer;
+    transition: background 0.25s ease, transform 0.25s ease;
+}
+
+/* aktywne pola lekko pulsują */
+.energy-box.active {
+    transform: scale(1.08);
+}
+
+.energy-wrapper {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.energy-label {
+    margin-bottom: 6px;
+    font-weight: bold;
+}
+
+.energy-select {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+    width: 100%;
+}
+
+.energy-box {
+    height: 22px;
+    border-radius: 4px;
+    background: #ccc; /* start: pusty pasek */
+    cursor: pointer;
+    transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.energy-box.active {
+    transform: scale(1.08);
+}
+.energy-wrapper {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.energy-label {
+    margin-bottom: 6px;
+    font-weight: lighter;
+}
+
+.energy-select {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+    width: 100%;
+}
+
+.energy-box {
+    height: 22px;
+    border-radius: 4px;
+    background: #ccc; /* start: pusty pasek */
+    cursor: pointer;
+    transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.energy-box.active {
+    transform: scale(1.08);
+}
+
+
+
+
+
+
+

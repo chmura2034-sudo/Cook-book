@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Welcome</title>
+    <link id="favicon" rel="icon" type="image/png" href="/static/sun.png">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="card welcome-card">
+        <h1>Welcome to the website!</h1>
+
+        <div class="sky-wrapper">
+            <img id="sun" class="celestial" src="/static/sun.png">
+            <img id="moon" class="celestial" src="/static/moon.png">
+        </div>
+
+        <p>Nice to see you.</p>
+
+        <a class="btn full-width" href="/login">Go to Login</a>
+
+        <div class="theme-toggle">
+            <label class="switch">
+                <input type="checkbox" onchange="toggleTheme()" {{ 'checked' if theme == 'dark' else '' }}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+<script>
+function animateCelestial() {
+    const sun = document.getElementById("sun");
+    const moon = document.getElementById("moon");
+
+    sun.classList.add("orbit");
+    moon.classList.add("orbit");
+
+    sun.classList.remove("sun-exit", "moon-enter");
+    moon.classList.remove("sun-exit", "moon-enter");
+
+    void sun.offsetWidth;
+
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+
+    if (isDark) {
+        sun.classList.add("sun-exit");
+        moon.classList.add("moon-enter");
+    } else {
+        moon.classList.add("sun-exit");
+        sun.classList.add("moon-enter");
+    }
+}
+
+function toggleTheme() {
+    const isDark = document.querySelector('.switch input').checked;
+    const theme = isDark ? "dark" : "light";
+
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+
+    animateCelestial();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const saved = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", saved);
+    document.querySelector('.switch input').checked = saved === "dark";
+});
+</script>
+
+</body>
+</html>
+
+
+
