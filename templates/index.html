@@ -1,76 +1,67 @@
 <!DOCTYPE html>
-<html lang="pl" data-theme="light">
+<html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Cook-Book</title>
     <link id="favicon" rel="icon" type="image/png" href="/static/logo.png">
     <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CookBook — Witaj!</title>
+
 </head>
 
 <body>
-    <div class="card welcome-card">
-        <h1>Tu było ściernisko...</h1>
 
-        <div class="sky-wrapper">
-            <img id="sun" class="celestial" src="/static/sun.png">
-            <img id="moon" class="celestial" src="/static/moon.png">
+<header>
+    <div class="header-left"></div>
+
+    <div class="header-title"><a href="/">CookBook</a></div>
+
+    <button id="themeToggle">🌙</button>
+</header>
+
+
+<div class="hero-wrapper">
+    <section class="hero">
+
+        <img src="/static/logo.png" alt="CookBook Logo">
+
+        <h1>Witaj w CookBook!</h1>
+        <p>Twoje miejsce na przepisy, inspiracje i kulinarne eksperymenty.</p>
+
+        <div class="buttons">
+            <a href="/add_recipe" class="btn-outline">Dodaj przepis</a>
+            <a href="/recipes" class="btn-outline">Przeglądaj przepisy</a>
         </div>
+    </section>
+</div>
 
-        <p>Zmiana pory dnia</p>
-
-        <div class="theme-toggle">
-            <label class="switch">
-                <input type="checkbox" onchange="toggleTheme()" {{ 'checked' if theme == 'dark' else '' }}>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
+<footer>
+    © {{ year }} CookBook — Smacznego!
+</footer>
 
 <script>
-function animateCelestial() {
-    const sun = document.getElementById("sun");
-    const moon = document.getElementById("moon");
+    const toggle = document.getElementById("themeToggle");
+    const body = document.body;
 
-    sun.classList.add("orbit");
-    moon.classList.add("orbit");
-
-    sun.classList.remove("sun-exit", "moon-enter");
-    moon.classList.remove("sun-exit", "moon-enter");
-
-    void sun.offsetWidth;
-
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-
-    if (isDark) {
-        sun.classList.add("sun-exit");
-        moon.classList.add("moon-enter");
-    } else {
-        moon.classList.add("sun-exit");
-        sun.classList.add("moon-enter");
+    // Wczytaj zapisany motyw
+    if (localStorage.getItem("theme") === "dark") {
+        body.classList.add("dark");
+        toggle.textContent = "☀️";
     }
-}
 
-function toggleTheme() {
-    const isDark = document.querySelector('.switch input').checked;
-    const theme = isDark ? "dark" : "light";
+    toggle.addEventListener("click", () => {
+        body.classList.toggle("dark");
 
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-
-    animateCelestial();
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-    const saved = localStorage.getItem("theme") || "light";
-    document.documentElement.setAttribute("data-theme", saved);
-    document.querySelector('.switch input').checked = saved === "dark";
-});
+        if (body.classList.contains("dark")) {
+            localStorage.setItem("theme", "dark");
+            toggle.textContent = "☀️";
+        } else {
+            localStorage.setItem("theme", "light");
+            toggle.textContent = "🌙";
+        }
+    });
 </script>
 
 </body>
 </html>
-
-
 

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Konto użytkownika</title>
+    <link id="favicon" rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://www.google.com/recaptcha/enterprise.js?render=6Lf0_2EsAAAAAAhcW6rbAwRVRlODbWvCxvSLdsNj"></script>
+</head>
+
+<body>
+
+<header>
+    <div class="header-left"></div>
+    <div class="header-title"><a href="/">CookBook</a></div>
+    <button id="themeToggle">🌙</button>
+</header>
+
+<div class="auth-wrapper">
+
+    <!-- LOGIN -->
+    <div id="loginView" class="auth-box">
+        <h2>Logowanie</h2>
+        <div id="loginMessage" class="auth-msg"></div>
+
+        <input type="text" id="loginEmail" placeholder="Login">
+        <input type="password" id="loginPassword" placeholder="Hasło">
+        <button onclick="login()">Zaloguj</button>
+
+        <div class="auth-link" onclick="showRegister()">Nie masz konta? Zarejestruj się</div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="registerView" class="auth-box hidden">
+        <h2>Rejestracja</h2>
+        <div id="registerMessage" class="auth-msg"></div>
+
+        <input type="text" id="regEmail" placeholder="Login">
+
+        <input type="password" id="regPassword" placeholder="Hasło" oninput="checkStrength(); checkMatch();">
+
+        <div id="strength-bar"><div id="strength-fill"></div></div>
+        <p id="strength-text" class="small"></p>
+
+        <input type="password" id="regPassword2" placeholder="Powtórz hasło" oninput="checkMatch()">
+        <p id="match-text" class="small"></p>
+        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+        <div class="g-recaptcha" data-sitekey="..."></div>
+        <button onclick="register()">Zarejestruj</button>
+
+
+
+
+        <div class="auth-link" onclick="showLogin()">Masz już konto? Zaloguj się</div>
+    </div>
+
+    <!-- USER PANEL -->
+    <div id="userView" class="auth-box hidden">
+        <h2>Twoje konto</h2>
+
+        <p><b>Login:</b> <span id="userEmail"></span></p>
+        <p><b>Data utworzenia konta:</b> <span id="createdAt"></span></p>
+
+        <a href="/add_recipe" class="btn-outline" style="display:block;margin-top:15px;">➕ Dodaj nowy przepis</a>
+
+        <button onclick="logout()" style="margin-top:20px;">Wyloguj</button>
+    </div>
+
+</div>
+
+<footer>© 2026 CookBook — Smacznego!</footer>
+
+<script>
+document.getElementById("registerForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    register();
+});
+
+
+
+
+/* MOTYW */
+const toggle = document.getElementById("themeToggle");
+const body = document.body;
+
+if (localStorage.getItem("theme") === "dark") {
+    body.classList.add("dark");
+    toggle.textContent = "☀️";
+}
+
+toggle.addEventListener("click", () => {
+    body.classList.toggle("dark");
+    if (body.classList.contains("dark")) {
+        localStorage.setItem("theme", "dark");
+        toggle.textContent = "☀️";
+    } else {
+        localStorage.setItem("theme", "light");
+        toggle.textContent = "🌙";
+    }
+});
+
+/* PRZEŁĄCZANIE WIDOKÓW */
+function showLogin() {
+    loginView.classList.remove("hidden");
+    registerView.classList.add("hidden");
+    userView.classList.add("hidden");
+}
+
+function showRegister() {
+    loginView.classList.add("hidden");
+    registerView.classList.remove("hidden");
+    userView.classList.add("hidden");
+}
+
+function showUserPanel(data) {
+    loginView.classList.add("hidden");
+    registerView.classList.add("hidden");
+    userView.classList.remove("hidden");
+
+    userEmail.textContent = data.username;
+    createdAt.textContent = data.created_at;
+}
+
+/* LOGOWANIE */
+async function login() {
+    const email = loginEmail.value;
+    const pass = loginPassword.value;
+
+    if (!email || !pass) 
+        return showLoginMessage("Wypełnij wszystkie pola");
+
+    const formData = new FormData();
+    formData.append("username", email);
+    formData.append("password", pass);
+
+    try {
+        const res = await fetch("/api/login", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) return showLoginMessage(data.error);
+
+        localStorage.setItem("token", data.token);
+        await fetchUserAndShow();
+
+    } catch {
+        showLoginMessage("Błąd połączenia z serwerem");
+    }
+}
+
+/* REJESTRACJA — UJEDNOLICONA */
+async function register() {
+    const email = regEmail.value;
+    const pass = regPassword.value;
+    const pass2 = regPassword2.value;
+
+    if (!email || !pass || !pass2) 
+        return showRegisterMessage("Wypełnij wszystkie pola");
+
+    if (pass !== pass2) 
+        return showRegisterMessage("Hasła nie są takie same");
+
+    const recaptchaToken = grecaptcha.getResponse();
+    if (!recaptchaToken) 
+        return showRegisterMessage("Potwierdź, że nie jesteś robotem");
+
+    const formData = new FormData();
+    formData.append("username", email);
+    formData.append("password", pass);
+    formData.append("g-recaptcha-response", recaptchaToken);
+
+    try {
+        const res = await fetch("/api/register", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) return showRegisterMessage(data.error);
+
+        // automatyczne logowanie
+        await loginAfterRegister(email, pass);
+
+    } catch {
+        showRegisterMessage("Błąd połączenia z serwerem");
+    }
+}
+
+async function loginAfterRegister(email, pass) {
+    const formData = new FormData();
+    formData.append("username", email);
+    formData.append("password", pass);
+
+    const res = await fetch("/api/login", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) return showRegisterMessage("Konto utworzone, ale logowanie nie powiodło się");
+
+    localStorage.setItem("token", data.token);
+    await fetchUserAndShow();
+}
+
+/* WYLOGOWANIE */
+function logout() {
+    localStorage.removeItem("token");
+    showLogin();
+}
+
+/* AUTOLOGOWANIE */
+window.onload = () => {
+    const token = localStorage.getItem("token");
+    if (token) fetchUserAndShow();
+    else showLogin();
+};
+
+async function fetchUserAndShow() {
+    const token = localStorage.getItem("token");
+    if (!token) return showLogin();
+
+    try {
+        const res = await fetch("/api/me", {
+            headers: { "Authorization": "Bearer " + token }
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            localStorage.removeItem("token");
+            return showLogin();
+        }
+
+        showUserPanel(data);
+
+    } catch {
+        showLogin();
+    }
+}
+
+/* KOMUNIKATY */
+function showLoginMessage(text) {
+    loginMessage.textContent = text;
+    loginMessage.classList.add("error");
+}
+
+function showRegisterMessage(text) {
+    registerMessage.textContent = text;
+    registerMessage.classList.add("error");
+}
+
+/* SIŁA HASŁA */
+function checkStrength() {
+    const pwd = regPassword.value;
+    const fill = document.getElementById("strength-fill");
+    const text = document.getElementById("strength-text");
+
+
+    let score = 0;
+    if (pwd.length >= 6) score++;
+    if (pwd.length >= 10) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+    fill.style.width = (score / 5) * 100 + "%";
+
+    if (!pwd) {
+        fill.style.width = "0%";
+        text.textContent = "";
+        return;
+    }
+
+    const labels = ["Bardzo słabe", "Słabe", "Średnie", "Dobre", "Bardzo dobre"];
+    const colors = ["red", "orange", "yellow", "lightgreen", "green"];
+
+    text.textContent = labels[score - 1] || "Bardzo słabe";
+    fill.style.background = colors[score - 1] || "red";
+}
+
+
+/* ZGODNOŚĆ HASEŁ */
+function checkMatch() {
+    const p1 = regPassword.value;
+    const p2 = regPassword2.value;
+
+    if (!p2) return matchText.textContent = "";
+
+    if (p1 !== p2) {
+        matchText.textContent = "Hasła nie są takie same";
+        matchText.style.color = "red";
+    } else {
+        matchText.textContent = "Hasła pasują";
+        matchText.style.color = "green";
+    }
+}
+</script>
+
+</body>
+</html>

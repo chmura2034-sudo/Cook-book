@@ -1,4 +1,4 @@
-#!/home/kernel/Documents/App/venv/bin/python3
+#!/home/kernel/Documents/Cook-book/venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

@@ -1,0 +1,7 @@
+Flask
+python-dotenv
+requests
+gunicorn
+flask_bcrypt
+PyJWT
+pillow

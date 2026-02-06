@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Przepis</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link id="favicon" rel="icon" type="image/png" href="/static/logo.png">
+</head>
+<body>
+
+<header>
+    <div class="header-left"></div>
+    <div class="header-title"><a href="/">CookBook</a></div>
+    <button id="themeToggle">🌙</button>
+</header>
+
+<div id="recipe"></div>
+
+<script>
+async function loadRecipe() {
+    const id = window.location.pathname.split("/").pop();
+    const res = await fetch(`/api/recipe/${id}`);
+    const r = await res.json();
+
+    const div = document.getElementById("recipe");
+
+    div.innerHTML = `
+        <h1>${r.title}</h1>
+        <p>${r.description}</p>
+
+        <h2>Składniki</h2>
+        <ul>
+            ${r.ingredients.map(i => `<li>${i.amount} ${i.unit || ""} — ${i.name}</li>`).join("")}
+        </ul>
+
+        <h2>Kroki</h2>
+        <ol>
+            ${r.steps.map(s => `<li>${s.instruction}</li>`).join("")}
+        </ol>
+
+        <h2>Zdjęcia</h2>
+        <div class="photo-grid">
+            ${r.photos.map(p => `<img src="/${p.file_path}">`).join("")}
+        </div>
+
+        <h2>Tagi</h2>
+        <div class="tags">${r.tags.map(t => `<span>${t}</span>`).join("")}</div>
+
+        <h2>Forma</h2>
+        <p>${JSON.stringify(r.size)}</p>
+    `;
+}
+
+loadRecipe();
+    const toggle = document.getElementById("themeToggle");
+    const body = document.body;
+
+    // Wczytaj zapisany motyw
+    if (localStorage.getItem("theme") === "dark") {
+        body.classList.add("dark");
+        toggle.textContent = "☀️";
+    }
+
+    toggle.addEventListener("click", () => {
+        body.classList.toggle("dark");
+
+        if (body.classList.contains("dark")) {
+            localStorage.setItem("theme", "dark");
+            toggle.textContent = "☀️";
+        } else {
+            localStorage.setItem("theme", "light");
+            toggle.textContent = "🌙";
+        }
+    });
+
+
+
+</script>
+
+</body>
+</html>

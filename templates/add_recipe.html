@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<link id="favicon" rel="icon" type="image/png" href="/static/logo.png">
+<link rel="stylesheet" href="/static/style.css">
+<meta charset="UTF-8">
+<title>Dodaj przepis</title>
+
+</head>
+<body>
+<header>
+    <div class="header-left"></div>
+    <div class="header-title"><a href="/">CookBook</a></div>
+    <button id="themeToggle">🌙</button>
+</header>
+<h1>Dodaj nowy przepis</h1>
+
+<form id="recipeForm">
+
+    <!-- Tytuł i opis -->
+    <h2>Podstawowe informacje</h2>
+    <label>Tytuł przepisu</label>
+    <input type="text" id="title" required>
+
+    <label>Opis</label>
+    <textarea id="description" rows="4"></textarea>
+
+    <!-- Składniki -->
+    <h2>Składniki</h2>
+    <div id="ingredients"></div>
+    <button type="button" onclick="addIngredient()">Dodaj składnik</button>
+
+    <!-- Kroki -->
+    <h2>Kroki</h2>
+    <div id="steps"></div>
+    <button type="button" onclick="addStep()">Dodaj krok</button>
+
+    <!-- Zdjęcia -->
+    <h2>Zdjęcia</h2>
+    <input type="file" id="photos" multiple accept="image/*">
+
+    <!-- Tagi -->
+<h2 class="accordion">Tagi</h2>
+<div class="panel">
+    <div class="tag-list">
+    </div>
+</div>
+
+
+    <!-- Rozmiar naczynia -->
+<h2 class="accordion">Rozmiar naczynia</h2>
+<div class="panel">
+
+    <label>
+        Brak formy
+        <input type="radio" name="sizeType" value="none" checked>
+    </label><br>
+
+    <label>
+        Okrągła forma
+        <input type="radio" name="sizeType" value="round">
+    </label>
+    <input type="text" id="diameter" placeholder="Średnica (cm)" disabled>
+
+    <label>
+        Prostokątna forma
+        <input type="radio" name="sizeType" value="rect">
+    </label>
+    <div class="row">
+        <input type="text" id="length" placeholder="Długość (cm)" disabled>
+        <input type="text" id="width" placeholder="Szerokość (cm)" disabled>
+    </div>
+
+</div>
+
+
+    <button type="submit">Zapisz przepis</button>
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+
+    // --- AUTORYZACJA ---
+    const token = localStorage.getItem("token");
+    if (!token) {
+        window.location.href = "/account";
+        return;
+    }
+
+    // --- TAGI ---
+    await loadTags();
+
+    // --- OBSŁUGA ZMIANY ROZMIARU NACZYNIA ---
+    document.querySelectorAll("input[name='sizeType']").forEach(radio => {
+        radio.addEventListener("change", () => {
+            const type = document.querySelector("input[name='sizeType']:checked").value;
+
+            document.getElementById("diameter").disabled = type !== "round";
+            document.getElementById("length").disabled = type !== "rect";
+            document.getElementById("width").disabled = type !== "rect";
+        });
+    });
+
+    // --- SUBMIT FORMULARZA ---
+    document.getElementById("recipeForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!validateRecipe()) return;
+
+        const data = {
+            title: document.getElementById("title").value,
+            description: document.getElementById("description").value,
+            ingredients: [],
+            steps: [],
+            tags: [],
+            size: {}
+        };
+
+        document.querySelectorAll(".ing-name").forEach((el, i) => {
+            data.ingredients.push({
+                name: el.value,
+                amount: document.querySelectorAll(".ing-amount")[i].value,
+                unit: document.querySelectorAll(".ing-unit")[i].value
+            });
+        });
+
+        document.querySelectorAll(".step-text").forEach(el => {
+            data.steps.push(el.value);
+        });
+
+        document.querySelectorAll(".tag-list input:checked").forEach(el => {
+            data.tags.push(el.value);
+        });
+
+        const sizeType = document.querySelector("input[name='sizeType']:checked").value;
+
+        if (sizeType === "round") {
+            data.size = {
+                type: "round",
+                diameter: document.getElementById("diameter").value
+            };
+        } else if (sizeType === "rect") {
+            data.size = {
+                type: "rect",
+                length: document.getElementById("length").value,
+                width: document.getElementById("width").value
+            };
+        } else {
+            data.size = { type: "none" };
+        }
+
+        const formData = new FormData();
+        formData.append("data", JSON.stringify(data));
+
+        const photos = document.getElementById("photos").files;
+        for (let i = 0; i < photos.length; i++) {
+            formData.append("photos", photos[i]);
+        }
+
+        const res = await fetch("/api/add_recipe", {
+            method: "POST",
+            headers: {
+                "Authorization": "Bearer " + token
+            },
+            body: formData
+        });
+
+        const result = await res.json();
+
+        if (!res.ok) {
+            alert("Błąd: " + result.error);
+            return;
+        }
+
+        alert("Przepis dodany!");
+    });
+
+    // --- AKORDEONY ---
+    document.querySelectorAll(".accordion").forEach(acc => {
+        acc.addEventListener("click", () => {
+            const panel = acc.nextElementSibling;
+            panel.style.display = panel.style.display === "block" ? "none" : "block";
+        });
+    });
+
+});
+
+// --- FUNKCJA ŁADOWANIA TAGÓW ---
+async function loadTags() {
+    const res = await fetch("/api/tags");
+    const data = await res.json();
+
+    const container = document.querySelector(".tag-list");
+    container.innerHTML = "";
+
+    data.tags.forEach(tag => {
+        const label = document.createElement("label");
+        label.classList.add("tag-item");
+
+        label.innerHTML = `
+            ${tag}
+            <input type="checkbox" value="${tag}">
+        `;
+
+        container.appendChild(label);
+    });
+}
+
+// --- DODAWANIE SKŁADNIKÓW ---
+function addIngredient() {
+    const container = document.getElementById("ingredients");
+
+    const row = document.createElement("div");
+    row.classList.add("ingredient-row");
+
+    row.innerHTML = `
+        <input type="text" class="ing-name" placeholder="Nazwa składnika">
+
+        <input type="number" class="ing-amount" placeholder="Ilość" min="0" step="0.1">
+
+        <select class="ing-unit">
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="szt">szt</option>
+        </select>
+
+        <button type="button" class="remove-btn" onclick="removeIngredient(this)">Usuń</button>
+    `;
+
+    container.appendChild(row);
+}
+
+function removeIngredient(btn) {
+    btn.parentElement.remove();
+}
+
+
+// --- DODAWANIE KROKÓW ---
+function addStep() {
+    const container = document.getElementById("steps");
+
+    const row = document.createElement("div");
+    row.classList.add("step-row");
+
+    row.innerHTML = `
+        <span class="step-number"></span>
+        <textarea class="step-text" placeholder="Opis kroku"></textarea>
+        <button type="button" class="remove-btn" onclick="removeStep(this)">Usuń</button>
+    `;
+
+    container.appendChild(row);
+    renumberSteps();
+}
+
+function removeStep(btn) {
+    btn.parentElement.remove();
+    renumberSteps();
+}
+
+
+function renumberSteps() {
+    const steps = document.querySelectorAll(".step-row");
+    steps.forEach((row, index) => {
+        const label = row.querySelector(".step-number");
+        label.textContent = (index + 1) + ".";
+    });
+}
+
+function validateRecipe() {
+    // Walidacja składników
+    const names = document.querySelectorAll(".ing-name");
+    const amounts = document.querySelectorAll(".ing-amount");
+    const units = document.querySelectorAll(".ing-unit");
+
+    for (let i = 0; i < names.length; i++) {
+        if (!names[i].value.trim()) {
+            alert("Uzupełnij nazwę składnika w wierszu " + (i + 1));
+            return false;
+        }
+        if (!amounts[i].value.trim()) {
+            alert("Uzupełnij ilość składnika w wierszu " + (i + 1));
+            return false;
+        }
+        if (!units[i].value.trim()) {
+            alert("Wybierz jednostkę składnika w wierszu " + (i + 1));
+            return false;
+        }
+    }
+
+    // Walidacja kroków
+    const steps = document.querySelectorAll(".step-text");
+    for (let i = 0; i < steps.length; i++) {
+        if (!steps[i].value.trim()) {
+            alert("Uzupełnij opis kroku nr " + (i + 1));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+    const toggle = document.getElementById("themeToggle");
+    const body = document.body;
+
+    // Wczytaj zapisany motyw
+    if (localStorage.getItem("theme") === "dark") {
+        body.classList.add("dark");
+        toggle.textContent = "☀️";
+    }
+
+    toggle.addEventListener("click", () => {
+        body.classList.toggle("dark");
+
+        if (body.classList.contains("dark")) {
+            localStorage.setItem("theme", "dark");
+            toggle.textContent = "☀️";
+        } else {
+            localStorage.setItem("theme", "light");
+            toggle.textContent = "🌙";
+        }
+    });
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Przepisy</title>
+    <link rel="stylesheet" href="/static/style.css">
+     <link id="favicon" rel="icon" type="image/png" href="/static/logo.png">
+</head>
+<body>
+
+<header>
+    <div class="header-left"></div>
+    <div class="header-title"><a href="/">CookBook</a></div>
+    <button id="themeToggle">🌙</button>
+</header>
+
+<h1>Przepisy</h1>
+
+<div id="recipes" class="recipe-grid"></div>
+
+<script>
+async function loadRecipes() {
+    const res = await fetch("/api/recipes");
+    const data = await res.json();
+
+    const container = document.getElementById("recipes");
+    container.innerHTML = "";
+
+    data.recipes.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "recipe-card";
+
+        div.innerHTML = `
+            <img src="/${r.thumb || 'static/no-photo.png'}" class="thumb">
+            <h3>${r.title}</h3>
+            <p>${r.description || ""}</p>
+            <div class="tags">${r.tags.map(t => `<span>${t}</span>`).join("")}</div>
+            <button onclick="location.href='/recipe/${r.id}'">Zobacz</button>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+loadRecipes();
+    const toggle = document.getElementById("themeToggle");
+    const body = document.body;
+
+    // Wczytaj zapisany motyw
+    if (localStorage.getItem("theme") === "dark") {
+        body.classList.add("dark");
+        toggle.textContent = "☀️";
+    }
+
+    toggle.addEventListener("click", () => {
+        body.classList.toggle("dark");
+
+        if (body.classList.contains("dark")) {
+            localStorage.setItem("theme", "dark");
+            toggle.textContent = "☀️";
+        } else {
+            localStorage.setItem("theme", "light");
+            toggle.textContent = "🌙";
+        }
+    });
+
+
+
+
+</script>
+
+</body>
+</html>
