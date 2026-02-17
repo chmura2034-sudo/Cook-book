@@ -13,6 +13,8 @@ from markupsafe import escape
 import secrets
 from functools import wraps
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+import requests
 load_dotenv()
 
 
