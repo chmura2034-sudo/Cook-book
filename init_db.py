@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS recipes (
     description   TEXT,
     rating        REAL,
     is_size     BOOLEAN DEFAULT 0,
+    number_of_servings INTEGER,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -128,6 +129,29 @@ CREATE TABLE IF NOT EXISTS recipe_photos (
         ON DELETE CASCADE
 );
  """)
+
+cursor.execute("""
+insert into tags (name) values
+    ('wegańskie'),
+    ('wegetariańskie'),
+    ('śniadanie'),
+    ('obiad'),
+    ('kolacja'),
+    ('deser'),
+    ('przekąska'),
+    ('przystawka'),
+    ('szybkie');
+""")
+
+
+
+
+
+
+
+
+
+
 
 conn.commit()
 conn.close()

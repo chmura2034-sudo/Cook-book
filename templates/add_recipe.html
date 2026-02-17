@@ -14,6 +14,10 @@
     <button id="themeToggle">🌙</button>
 </header>
 <h1>Dodaj nowy przepis</h1>
+<div id="editModeBanner" style="display:none;margin-bottom:16px;padding:8px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:6px;max-width:600px;">
+    <b>Tryb edycji przepisu</b>
+    <button id="deleteRecipeBtn" class="btn-primary" style="background:#e53e3e;float:right;">Usuń przepis</button>
+</div>
 
 <form id="recipeForm">
 
@@ -50,6 +54,10 @@
     <!-- Rozmiar naczynia -->
 <h2 class="accordion">Rozmiar naczynia</h2>
 <div class="panel">
+    <label>
+        Ilość porcji
+        <input type="number" id="servings" min="1">
+    </label><br>
 
     <label>
         Brak formy
@@ -75,10 +83,52 @@
 
 
     <button type="submit">Zapisz przepis</button>
+<button type="button" id="cancelEditBtn" style="display:none;margin-left:12px;">Anuluj edycję</button>
 </form>
 
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
+    // --- DETEKCJA TRYBU EDYCJI ---
+    const urlParts = window.location.pathname.split("/");
+    const recipeId = urlParts.includes("edit") ? urlParts.pop() : null;
+    const editModeBanner = document.getElementById("editModeBanner");
+    const deleteRecipeBtn = document.getElementById("deleteRecipeBtn");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+    if (recipeId) {
+        editModeBanner.style.display = "block";
+        cancelEditBtn.style.display = "inline-block";
+        // Pobierz dane przepisu i wypełnij formularz
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/recipe/${recipeId}`, {
+            headers: {Authorization: "Bearer " + token}
+        });
+        if (res.ok) {
+            const r = await res.json();
+            document.getElementById("title").value = r.title || "";
+            document.getElementById("description").value = r.description || "";
+            document.getElementById("servings").value = r.servings || 1;
+            // Składniki
+            document.getElementById("ingredients").innerHTML = "";
+            (r.ingredients||[]).forEach(i => addIngredient(i.name, i.amount, i.unit));
+            // Kroki
+            document.getElementById("steps").innerHTML = "";
+            (r.steps||[]).forEach(s => addStep(s.instruction));
+            // Tagi
+            await loadTags();
+            document.querySelectorAll(".tag-list input").forEach(cb => {
+                cb.checked = (r.tags||[]).includes(cb.value);
+            });
+            // Rozmiar naczynia
+            if (r.size && r.size.type) {
+                document.querySelector(`input[name='sizeType'][value='${r.size.type}']`).checked = true;
+                if (r.size.type === "round") document.getElementById("diameter").value = r.size.diameter || "";
+                if (r.size.type === "rect") {
+                    document.getElementById("length").value = r.size.length || "";
+                    document.getElementById("width").value = r.size.width || "";
+                }
+            }
+        }
+    }
 
     // --- AUTORYZACJA ---
     const token = localStorage.getItem("token");
@@ -109,6 +159,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = {
             title: document.getElementById("title").value,
             description: document.getElementById("description").value,
+            servings: document.getElementById("servings").value ? parseInt(document.getElementById("servings").value, 10) : null,
             ingredients: [],
             steps: [],
             tags: [],
@@ -156,22 +207,50 @@ document.addEventListener("DOMContentLoaded", async () => {
             formData.append("photos", photos[i]);
         }
 
-        const res = await fetch("/api/add_recipe", {
-            method: "POST",
-            headers: {
-                "Authorization": "Bearer " + token
-            },
-            body: formData
-        });
-
-        const result = await res.json();
-
-        if (!res.ok) {
-            alert("Błąd: " + result.error);
-            return;
+                let res, result;
+                if (recipeId) {
+                    // EDYCJA
+                    res = await fetch(`/api/recipe/${recipeId}`, {
+                        method: "PUT",
+                        headers: {"Authorization": "Bearer " + token},
+                        body: formData
+                    });
+                } else {
+                    // DODAWANIE
+                    res = await fetch("/api/add_recipe", {
+                        method: "POST",
+                        headers: {"Authorization": "Bearer " + token},
+                        body: formData
+                    });
+                }
+                result = await res.json();
+                if (!res.ok) {
+                    alert("Błąd: " + result.error);
+                    return;
+                }
+                alert(recipeId ? "Przepis zaktualizowany!" : "Przepis dodany!");
+                if (recipeId) window.location.href = `/recipe/${recipeId}`;
+        // --- USUWANIE PRZEPISU ---
+        if (recipeId) {
+            deleteRecipeBtn.addEventListener("click", async () => {
+                if (!confirm("Czy na pewno chcesz usunąć ten przepis?")) return;
+                const token = localStorage.getItem("token");
+                const res = await fetch(`/api/recipe/${recipeId}`, {
+                    method: "DELETE",
+                    headers: {"Authorization": "Bearer " + token}
+                });
+                if (res.ok) {
+                    alert("Przepis usunięty!");
+                    window.location.href = "/";
+                } else {
+                    const err = await res.json();
+                    alert("Błąd: " + (err.error||"Nieznany"));
+                }
+            });
+            cancelEditBtn.addEventListener("click", () => {
+                window.location.href = "/add_recipe";
+            });
         }
-
-        alert("Przepis dodany!");
     });
 
     // --- AKORDEONY ---
@@ -215,7 +294,7 @@ function addIngredient() {
     row.innerHTML = `
         <input type="text" class="ing-name" placeholder="Nazwa składnika">
 
-        <input type="number" class="ing-amount" placeholder="Ilość" min="0" step="0.1">
+        <input type="number" class="ing-amount" placeholder="Ilość" min="0.1" step="0.1">
 
         <select class="ing-unit">
             <option value="g">g</option>
@@ -266,31 +345,85 @@ function renumberSteps() {
 }
 
 function validateRecipe() {
-    // Walidacja składników
+    const title = document.getElementById("title").value.trim();
+    if (!title || title.length < 1 || title.length > 200) {
+        alert("Tytuł musi zawierać 1-200 znaków");
+        return false;
+    }
+
+    const description = document.getElementById("description").value.trim();
+    if (description.length > 2000) {
+        alert("Opis nie może przekroczyć 2000 znaków");
+        return false;
+    }
+    
     const names = document.querySelectorAll(".ing-name");
     const amounts = document.querySelectorAll(".ing-amount");
     const units = document.querySelectorAll(".ing-unit");
 
+    if (names.length === 0) {
+        alert("Musisz dodać przynajmniej jeden składnik");
+        return false;
+    }
+
     for (let i = 0; i < names.length; i++) {
-        if (!names[i].value.trim()) {
-            alert("Uzupełnij nazwę składnika w wierszu " + (i + 1));
+        const name = names[i].value.trim();
+        if (!name || name.length > 150) {
+            alert("Nazwa składnika w wierszu " + (i + 1) + " musi mieć 1-150 znaków");
             return false;
         }
-        if (!amounts[i].value.trim()) {
-            alert("Uzupełnij ilość składnika w wierszu " + (i + 1));
+        
+        const amount = parseFloat(amounts[i].value);
+        if (isNaN(amount) || amount <= 0) {
+            alert("Ilość składnika w wierszu " + (i + 1) + " musi być > 0");
             return false;
         }
+        
         if (!units[i].value.trim()) {
             alert("Wybierz jednostkę składnika w wierszu " + (i + 1));
             return false;
         }
     }
 
-    // Walidacja kroków
     const steps = document.querySelectorAll(".step-text");
+    if (steps.length === 0) {
+        alert("Musisz dodać przynajmniej jeden krok");
+        return false;
+    }
+    
     for (let i = 0; i < steps.length; i++) {
-        if (!steps[i].value.trim()) {
-            alert("Uzupełnij opis kroku nr " + (i + 1));
+        const step = steps[i].value.trim();
+        if (!step || step.length > 1000) {
+            alert("Krok " + (i + 1) + " musi mieć 1-1000 znaków");
+            return false;
+        }
+    }
+
+    const servingsEl = document.getElementById("servings");
+    if (servingsEl && servingsEl.value) {
+        const sv = Number(servingsEl.value);
+        if (!Number.isInteger(sv) || sv < 1) {
+            alert("Ilość porcji musi być liczbą całkowitą >= 1");
+            return false;
+        }
+    }
+
+    const sizeType = document.querySelector("input[name='sizeType']:checked").value;
+    if (sizeType === "round") {
+        const diameter = parseFloat(document.getElementById("diameter").value);
+        if (isNaN(diameter) || diameter <= 0 || diameter > 100) {
+            alert("Średnica musi być między 0 a 100 cm");
+            return false;
+        }
+    } else if (sizeType === "rect") {
+        const length = parseFloat(document.getElementById("length").value);
+        const width = parseFloat(document.getElementById("width").value);
+        if (isNaN(length) || length <= 0 || length > 100) {
+            alert("Długość musi być między 0 a 100 cm");
+            return false;
+        }
+        if (isNaN(width) || width <= 0 || width > 100) {
+            alert("Szerokość musi być między 0 a 100 cm");
             return false;
         }
     }

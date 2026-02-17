@@ -16,66 +16,302 @@
 
 <div id="recipe"></div>
 
+<div id="scaling-panel" style="margin-bottom:24px;padding:12px 16px;background:var(--card-bg);border-radius:8px;max-width:520px;border:1px solid var(--border);">
+  <h3>Skalowanie przepisu</h3>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+    <label>Tryb:
+      <select id="scaling-mode">
+        <option value="servings">Według porcji</option>
+        <option value="vessel">Według wielkości formy</option>
+      </select>
+    </label>
+    <label id="scaling-servings-label">Porcje:
+      <input type="number" id="scaling-servings" min="1" style="width:60px;">
+    </label>
+    <label id="scaling-type-label" style="display:none;">Typ formy:
+      <select id="scaling-type">
+        <option value="round">Okrągła</option>
+        <option value="rect">Prostokątna</option>
+      </select>
+    </label>
+    <label id="scaling-diameter-label" style="display:none;">Średnica:
+      <input type="number" id="scaling-diameter" min="1" max="100" style="width:60px;">
+    </label>
+    <label id="scaling-length-label" style="display:none;">Długość:
+      <input type="number" id="scaling-length" min="1" max="100" style="width:60px;">
+    </label>
+    <label id="scaling-width-label" style="display:none;">Szerokość:
+      <input type="number" id="scaling-width" min="1" max="100" style="width:60px;">
+    </label>
+  </div>
+</div>
+
+<style>
+.ingredient-row, .step-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  margin-bottom: 4px;
+}
+.ingredient-dot {
+  width: 18px;
+  min-width: 18px;
+  text-align: center;
+  font-weight: bold;
+  margin-right: 0;
+}
+.ingredient-name {
+  width: 180px;
+  min-width: 120px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ingredient-amount {
+  width: 60px;
+  min-width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.ingredient-unit {
+  width: 60px;
+  min-width: 40px;
+  text-align: left;
+  flex-shrink: 0;
+}
+.step-number {
+  width: 32px;
+  min-width: 32px;
+  text-align: right;
+  font-weight: bold;
+  margin-right: 0;
+  flex-shrink: 0;
+}
+.step-text {
+  width: 320px;
+  min-width: 120px;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.checked {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.checkbox-right {
+  margin-left: auto;
+  width: 24px;
+  min-width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+ul#ingredients-list, ol#steps-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+</style>
+
 <script>
+let originalIngredients = [];
+let originalServings = 1;
+let originalSize = {};
+
+window.addEventListener("DOMContentLoaded", loadRecipe);
+
 async function loadRecipe() {
     const id = window.location.pathname.split("/").pop();
-    const res = await fetch(`/api/recipe/${id}`);
-    const r = await res.json();
-
     const div = document.getElementById("recipe");
+    try {
+      const res = await fetch(`/api/recipe/${id}`);
+      if (!res.ok) {
+        div.innerHTML = `<p style='color:red'>Błąd: nie znaleziono przepisu</p>`;
+        return;
+      }
+      r = await res.json();
+      function safe(val) {
+          return String(val).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+      function renderVessel(size) {
+          if (!size || !size.type || size.type === "none") return "Brak formy";
+          if (size.type === "round") return `Okrągła forma, średnica: ${safe(size.diameter)} cm`;
+          if (size.type === "rect") return `Prostokątna forma, długość: ${safe(size.length)} cm, szerokość: ${safe(size.width)} cm`;
+          return "Nieznany typ formy";
+      }
+      div.innerHTML = `
+          <h1>${safe(r.title)}</h1>
+          <div class="servings-info">${r.servings ? `Porcje: ${safe(r.servings)}` : ''}</div>
+          <p>${safe(r.description)}</p>
 
-    div.innerHTML = `
-        <h1>${r.title}</h1>
-        <p>${r.description}</p>
+          <h2>Składniki</h2>
+          <ul id="ingredients-list">
+              ${(Array.isArray(r.ingredients) ? r.ingredients : []).map((i, idx) => `
+                  <li class="ingredient-row">
+                    <span class="ingredient-dot">•</span>
+                    <span class="ingredient-name">${safe(i.name)}</span>
+                    <span class="ingredient-amount">${safe(i.amount)}</span>
+                    <span class="ingredient-unit">${safe(i.unit || "")}</span>
+                    <input type="checkbox" class="ing-check checkbox-right" data-idx="${idx}">
+                  </li>
+              `).join("")}
+          </ul>
 
-        <h2>Składniki</h2>
-        <ul>
-            ${r.ingredients.map(i => `<li>${i.amount} ${i.unit || ""} — ${i.name}</li>`).join("")}
-        </ul>
+          <h2>Kroki</h2>
+          <ol id="steps-list">
+              ${(Array.isArray(r.steps) ? r.steps : []).map((s, idx) => `
+                  <li class="step-row">
+                    <span class="step-number">${idx+1}.</span>
+                    <span class="step-text">${safe(s.instruction)}</span>
+                    <input type="checkbox" class="step-check checkbox-right" data-idx="${idx}">
+                  </li>
+              `).join("")}
+          </ol>
 
-        <h2>Kroki</h2>
-        <ol>
-            ${r.steps.map(s => `<li>${s.instruction}</li>`).join("")}
-        </ol>
+          <h2>Zdjęcia</h2>
+          <div class="photo-grid">
+              ${(Array.isArray(r.photos) ? r.photos : []).map(p => `<img src="/${safe(p.file_path)}">`).join("")}
+          </div>
 
-        <h2>Zdjęcia</h2>
-        <div class="photo-grid">
-            ${r.photos.map(p => `<img src="/${p.file_path}">`).join("")}
-        </div>
+          <h2>Tagi</h2>
+          <div class="tags">${(Array.isArray(r.tags) ? r.tags : []).map(t => `<span>${safe(t)}</span>`).join("")}</div>
 
-        <h2>Tagi</h2>
-        <div class="tags">${r.tags.map(t => `<span>${t}</span>`).join("")}</div>
+          <h2>Forma</h2>
+          <p>${renderVessel(r.size)}</p>
+      `;
 
-        <h2>Forma</h2>
-        <p>${JSON.stringify(r.size)}</p>
-    `;
+      originalIngredients = Array.isArray(r.ingredients) ? r.ingredients.map(i => ({...i})) : [];
+      originalServings = r.servings || 1;
+      originalSize = r.size || {type:"none"};
+
+      document.getElementById("scaling-mode").value = "servings";
+      document.getElementById("scaling-servings-label").style.display = "inline-block";
+      document.getElementById("scaling-type-label").style.display = "none";
+      document.getElementById("scaling-diameter-label").style.display = "none";
+      document.getElementById("scaling-length-label").style.display = "none";
+      document.getElementById("scaling-width-label").style.display = "none";
+
+      document.getElementById("scaling-servings").value = originalServings;
+      document.getElementById("scaling-type").value = originalSize.type === "rect" ? "rect" : "round";
+      document.getElementById("scaling-diameter").value = originalSize.diameter || "";
+      document.getElementById("scaling-length").value = originalSize.length || "";
+      document.getElementById("scaling-width").value = originalSize.width || "";
+
+      document.getElementById("scaling-mode").addEventListener("change", e => {
+        const mode = e.target.value;
+        if (mode === "servings") {
+          document.getElementById("scaling-servings-label").style.display = "inline-block";
+          document.getElementById("scaling-type-label").style.display = "none";
+          document.getElementById("scaling-diameter-label").style.display = "none";
+          document.getElementById("scaling-length-label").style.display = "none";
+          document.getElementById("scaling-width-label").style.display = "none";
+        } else {
+          document.getElementById("scaling-servings-label").style.display = "none";
+          document.getElementById("scaling-type-label").style.display = "inline-block";
+          const type = document.getElementById("scaling-type").value;
+          document.getElementById("scaling-diameter-label").style.display = type === "round" ? "inline-block" : "none";
+          document.getElementById("scaling-length-label").style.display = type === "rect" ? "inline-block" : "none";
+          document.getElementById("scaling-width-label").style.display = type === "rect" ? "inline-block" : "none";
+        }
+        scaleIngredients();
+      });
+      document.getElementById("scaling-type").addEventListener("change", e => {
+        const type = e.target.value;
+        document.getElementById("scaling-diameter-label").style.display = type === "round" ? "inline-block" : "none";
+        document.getElementById("scaling-length-label").style.display = type === "rect" ? "inline-block" : "none";
+        document.getElementById("scaling-width-label").style.display = type === "rect" ? "inline-block" : "none";
+        scaleIngredients();
+      });
+      ["scaling-servings","scaling-diameter","scaling-length","scaling-width"].forEach(id => {
+        document.getElementById(id).addEventListener("input", scaleIngredients);
+      });
+      scaleIngredients();
+    } catch (e) {
+      div.innerHTML = `<p style='color:red'>Błąd: nie można pobrać przepisu</p>`;
+      return;
+    }
 }
 
-loadRecipe();
-    const toggle = document.getElementById("themeToggle");
-    const body = document.body;
-
-    // Wczytaj zapisany motyw
-    if (localStorage.getItem("theme") === "dark") {
-        body.classList.add("dark");
-        toggle.textContent = "☀️";
+function scaleIngredients() {
+  const mode = document.getElementById("scaling-mode").value;
+  let totalFactor = 1;
+  if (mode === "servings") {
+    const servings = parseFloat(document.getElementById("scaling-servings").value) || 1;
+    totalFactor = servings/originalServings;
+  } else {
+    const type = document.getElementById("scaling-type").value;
+    let vesselFactor = 1;
+    if (type === "round") {
+      const diameter = parseFloat(document.getElementById("scaling-diameter").value) || 1;
+      const origDiameter = originalSize.type === "round" ? parseFloat(originalSize.diameter) || 1 : 1;
+      vesselFactor = Math.pow(diameter/origDiameter, 2);
+    } else if (type === "rect") {
+      const length = parseFloat(document.getElementById("scaling-length").value) || 1;
+      const width = parseFloat(document.getElementById("scaling-width").value) || 1;
+      const origLength = originalSize.type === "rect" ? parseFloat(originalSize.length) || 1 : 1;
+      const origWidth = originalSize.type === "rect" ? parseFloat(originalSize.width) || 1 : 1;
+      vesselFactor = (length*width)/(origLength*origWidth);
     }
-
-    toggle.addEventListener("click", () => {
-        body.classList.toggle("dark");
-
-        if (body.classList.contains("dark")) {
-            localStorage.setItem("theme", "dark");
-            toggle.textContent = "☀️";
-        } else {
-            localStorage.setItem("theme", "light");
-            toggle.textContent = "🌙";
-        }
+    totalFactor = vesselFactor;
+  }
+  const ul = document.getElementById("ingredients-list");
+  ul.innerHTML = originalIngredients.map((i, idx) => `
+    <li class="ingredient-row">
+      <span class="ingredient-dot">•</span>
+      <span class="ingredient-name">${i.name}</span>
+      <span class="ingredient-amount">${(parseFloat(i.amount)*totalFactor).toFixed(2)}</span>
+      <span class="ingredient-unit">${i.unit || ""}</span>
+      <input type="checkbox" class="ing-check checkbox-right" data-idx="${idx}">
+    </li>
+  `).join("");
+  document.querySelectorAll(".ing-check").forEach(cb => {
+    cb.addEventListener("change", e => {
+      const row = e.target.closest(".ingredient-row");
+      row.querySelector(".ingredient-name").classList.toggle("checked", e.target.checked);
+      row.querySelector(".ingredient-amount").classList.toggle("checked", e.target.checked);
+      row.querySelector(".ingredient-unit").classList.toggle("checked", e.target.checked);
     });
+  });
 
+  // Dodaj obsługę przekreślania kroków
+  document.querySelectorAll(".step-check").forEach(cb => {
+    cb.addEventListener("change", e => {
+      const row = e.target.closest(".step-row");
+      row.querySelector(".step-text").classList.toggle("checked", e.target.checked);
+    });
+  });
+}
 
+// Dodaj obsługę motywów
+function setupThemeToggle() {
+  const btn = document.getElementById("themeToggle");
+  const darkClass = "dark";
+  function setTheme(dark) {
+    if (dark) {
+      document.body.classList.add(darkClass);
+      localStorage.setItem("theme", "dark");
+      btn.textContent = "☀️";
+    } else {
+      document.body.classList.remove(darkClass);
+      localStorage.setItem("theme", "light");
+      btn.textContent = "🌙";
+    }
+  }
+  btn.addEventListener("click", () => {
+    setTheme(!document.body.classList.contains(darkClass));
+  });
+  // Ustaw motyw na start
+  setTheme(localStorage.getItem("theme") === "dark");
+}
 
+window.addEventListener("DOMContentLoaded", () => {
+  loadRecipe();
+  setupThemeToggle();
+});
 </script>
-
 </body>
 </html>

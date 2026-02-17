@@ -16,45 +16,99 @@
 
 <h1>Przepisy</h1>
 
+<div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+  <input id="searchInput" type="text" placeholder="Szukaj po nazwie..." style="padding:6px;min-width:200px;">
+  <div id="tagFilters" style="display:flex;gap:8px;"></div>
+</div>
+
 <div id="recipes" class="recipe-grid"></div>
+<div id="pagination" style="margin-top:24px;display:flex;gap:8px;"></div>
+
+<style>
+.recipe-card {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.recipe-thumb {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: #eee;
+}
+.recipe-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+.recipe-title {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 0;
+}
+.servings-info {
+  font-size: 0.95em;
+  color: #666;
+}
+.recipe-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.recipe-tags span {
+  background: var(--btn-bg);
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+}
+.recipe-btn {
+  margin-top: 8px;
+  align-self: flex-start;
+  background: var(--btn-bg);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: background 0.2s;
+}
+.recipe-btn:hover {
+  background: var(--btn-hover);
+}
+</style>
 
 <script>
-async function loadRecipes() {
-    const res = await fetch("/api/recipes");
-    const data = await res.json();
+let allRecipes = [];
+let filteredRecipes = [];
+let currentPage = 1;
+const RECIPES_PER_PAGE = 10;
+let allTags = [];
 
-    const container = document.getElementById("recipes");
-    container.innerHTML = "";
-
-    data.recipes.forEach(r => {
-        const div = document.createElement("div");
-        div.className = "recipe-card";
-
-        div.innerHTML = `
-            <img src="/${r.thumb || 'static/no-photo.png'}" class="thumb">
-            <h3>${r.title}</h3>
-            <p>${r.description || ""}</p>
-            <div class="tags">${r.tags.map(t => `<span>${t}</span>`).join("")}</div>
-            <button onclick="location.href='/recipe/${r.id}'">Zobacz</button>
-        `;
-
-        container.appendChild(div);
-    });
-}
-
-loadRecipes();
+function setupThemeToggle() {
     const toggle = document.getElementById("themeToggle");
     const body = document.body;
-
-    // Wczytaj zapisany motyw
+    if (!toggle) return;
     if (localStorage.getItem("theme") === "dark") {
         body.classList.add("dark");
         toggle.textContent = "☀️";
+    } else {
+        body.classList.remove("dark");
+        toggle.textContent = "🌙";
     }
-
     toggle.addEventListener("click", () => {
         body.classList.toggle("dark");
-
         if (body.classList.contains("dark")) {
             localStorage.setItem("theme", "dark");
             toggle.textContent = "☀️";
@@ -63,10 +117,86 @@ loadRecipes();
             toggle.textContent = "🌙";
         }
     });
+}
 
+async function loadTags() {
+    const res = await fetch("/api/tags");
+    const data = await res.json();
+    allTags = data.tags || [];
+    const tagFilters = document.getElementById("tagFilters");
+    tagFilters.innerHTML = allTags.map(tag => `
+      <label><input type="checkbox" class="tag-filter" value="${tag}"> ${tag}</label>
+    `).join("");
+}
 
+async function loadRecipes() {
+    const res = await fetch("/api/recipes");
+    const data = await res.json();
+    allRecipes = data.recipes;
+    applyFilters();
+}
 
+function applyFilters() {
+    const search = document.getElementById("searchInput").value.trim().toLowerCase();
+    const checkedTags = Array.from(document.querySelectorAll(".tag-filter:checked")).map(cb => cb.value);
+    filteredRecipes = allRecipes.filter(r => {
+        const matchesName = r.title.toLowerCase().includes(search);
+        const matchesTags = checkedTags.length === 0 || checkedTags.every(tag => r.tags.includes(tag));
+        return matchesName && matchesTags;
+    });
+    currentPage = 1;
+    renderRecipes();
+    renderPagination();
+}
 
+function renderRecipes() {
+    const container = document.getElementById("recipes");
+    container.innerHTML = "";
+    const start = (currentPage-1)*RECIPES_PER_PAGE;
+    const end = start + RECIPES_PER_PAGE;
+    const pageRecipes = filteredRecipes.slice(start, end);
+    if (pageRecipes.length === 0) {
+      container.innerHTML = '<p>Brak przepisów spełniających kryteria.</p>';
+      return;
+    }
+    pageRecipes.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "recipe-card";
+        div.innerHTML = `
+            <img src="/${r.thumb || 'static/no-photo.png'}" class="recipe-thumb">
+            <div class="recipe-info">
+              <div class="recipe-title">${r.title}</div>
+              <div class="servings-info">Porcje: ${r.servings ? r.servings : '-'}</div>
+              <p>${r.description || ""}</p>
+              <div class="recipe-tags">${r.tags.map(t => `<span>${t}</span>`).join("")}</div>
+              <button class="recipe-btn" onclick="location.href='/recipe/${r.id}'">Zobacz</button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function renderPagination() {
+    const pag = document.getElementById("pagination");
+    pag.innerHTML = "";
+    const totalPages = Math.ceil(filteredRecipes.length / RECIPES_PER_PAGE);
+    if (totalPages <= 1) return;
+    for (let i=1; i<=totalPages; ++i) {
+      const btn = document.createElement("button");
+      btn.textContent = i;
+      btn.disabled = (i === currentPage);
+      btn.onclick = () => { currentPage = i; renderRecipes(); renderPagination(); };
+      pag.appendChild(btn);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    setupThemeToggle();
+    await loadTags();
+    await loadRecipes();
+    document.getElementById("searchInput").addEventListener("input", applyFilters);
+    document.getElementById("tagFilters").addEventListener("change", applyFilters);
+});
 </script>
 
 </body>

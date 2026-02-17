@@ -5,3 +5,10 @@ gunicorn
 flask_bcrypt
 PyJWT
 pillow
+markupsafe
+werkzeug
+sqlite3
+secrets
+hmac
+hashlib
+uuid

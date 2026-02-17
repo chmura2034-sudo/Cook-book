@@ -1,22 +1,18 @@
-import os 
-import requests
-import uuid 
-import sqlite3 
-from pathlib import Path 
-from flask import Flask, request, jsonify, abort,  render_template, request
-from flask import send_from_directory
-from PIL import Image 
-from flask import send_file
-import hmac
+import os
+import uuid
+import sqlite3
+from pathlib import Path
+from flask import Flask, request, jsonify, abort, render_template, send_from_directory, send_file
 from PIL import Image
+import hmac
 import hashlib
 import jwt
 import json
 from werkzeug.utils import secure_filename
+from markupsafe import escape
 import secrets
 from functools import wraps
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 load_dotenv()
 
 
@@ -92,10 +88,15 @@ def require_auth(f):
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def create_thumbnail(src_path, dest_path, size=(400, 400)):
+
+
+# --- UNIWERSALNA FUNKCJA SKALUJĄCA ---
+def resize_image(src_path, dest_path, size):
     img = Image.open(src_path)
     img.thumbnail(size)
     img.save(dest_path)
+
+
 
 @app.get("/add_recipe")
 def add_recipe_page():
@@ -116,7 +117,7 @@ def recipes_page():
 
 @app.get("/recipe/<int:recipe_id>")
 def recipe_page(recipe_id):
-    return app.send_static_file("recipe.html")
+    return send_from_directory("static", "recipe.html")
 
 
 @app.route('/uploads/full/<path:filename>')
@@ -258,12 +259,105 @@ def add_recipe():
 
     data = json.loads(raw)
 
-    title = data["title"]
-    description = data["description"]
-    ingredients = data["ingredients"]
-    steps = data["steps"]
-    tags = data["tags"]
-    size = data["size"]
+    # ============================
+    # 2a. WALIDACJA DANYCH WEJŚCIOWYCH
+    # ============================
+    
+    # Walidacja i escape tytułu
+    title = data.get("title", "").strip()
+    if not title or len(title) < 1 or len(title) > 200:
+        return jsonify({"error": "Tytuł musi zawierać 1-200 znaków"}), 400
+    title = escape(title)
+    
+    # Walidacja i escape opisu
+    description = data.get("description", "").strip()
+    if len(description) > 2000:
+        return jsonify({"error": "Opis nie może przekroczyć 2000 znaków"}), 400
+    description = escape(description)
+    
+    # Walidacja składników
+    ingredients = data.get("ingredients", [])
+    if not isinstance(ingredients, list) or len(ingredients) == 0:
+        return jsonify({"error": "Musi być przynajmniej jeden składnik"}), 400
+    
+    for ing in ingredients:
+        if not isinstance(ing, dict):
+            return jsonify({"error": "Zły format składnika"}), 400
+        
+        ing_name = ing.get("name", "").strip()
+        if not ing_name or len(ing_name) > 150:
+            return jsonify({"error": "Nazwa składnika musi mieć 1-150 znaków"}), 400
+        ing["name"] = escape(ing_name)
+        
+        try:
+            ing_amount = float(ing.get("amount", 0))
+            if ing_amount <= 0:
+                return jsonify({"error": "Ilość składnika musi być > 0"}), 400
+            ing["amount"] = ing_amount
+        except (ValueError, TypeError):
+            return jsonify({"error": "Zła ilość składnika"}), 400
+        
+        ing_unit = ing.get("unit", "").strip()
+        if ing_unit not in ["g", "ml", "szt"]:
+            return jsonify({"error": "Jednostka musi być: g, ml, szt"}), 400
+        ing["unit"] = escape(ing_unit)
+    
+    # Walidacja kroków
+    steps = data.get("steps", [])
+    if not isinstance(steps, list) or len(steps) == 0:
+        return jsonify({"error": "Musi być przynajmniej jeden krok"}), 400
+    
+    for i, step in enumerate(steps):
+        step_text = step.strip() if isinstance(step, str) else ""
+        if not step_text or len(step_text) > 1000:
+            return jsonify({"error": f"Krok {i+1} musi mieć 1-1000 znaków"}), 400
+        steps[i] = escape(step_text)
+    
+    # Walidacja tagów
+    tags = data.get("tags", [])
+    if not isinstance(tags, list):
+        return jsonify({"error": "Tagi muszą być listą"}), 400
+    
+    # Walidacja rozmiaru naczynia
+    size = data.get("size", {})
+    if not isinstance(size, dict):
+        return jsonify({"error": "Zły format rozmiaru"}), 400
+    
+    size_type = size.get("type", "none")
+    if size_type not in ["none", "round", "rect"]:
+        return jsonify({"error": "Typ naczynia musi być: none, round, rect"}), 400
+    
+    if size_type == "round":
+        try:
+            diameter = float(size.get("diameter", 0))
+            if diameter <= 0 or diameter > 100:
+                return jsonify({"error": "Średnica musi być między 0 a 100 cm"}), 400
+            size["diameter"] = diameter
+        except (ValueError, TypeError):
+            return jsonify({"error": "Zła wartość średnicy"}), 400
+    
+    elif size_type == "rect":
+        try:
+            length = float(size.get("length", 0))
+            width = float(size.get("width", 0))
+            if length <= 0 or length > 100:
+                return jsonify({"error": "Długość musi być między 0 a 100 cm"}), 400
+            if width <= 0 or width > 100:
+                return jsonify({"error": "Szerokość musi być między 0 a 100 cm"}), 400
+            size["length"] = length
+            size["width"] = width
+        except (ValueError, TypeError):
+            return jsonify({"error": "Zła wartość długości/szerokości"}), 400
+    
+    # opcjonalna liczba porcji (może być null)
+    servings = data.get("servings")
+    if servings is not None:
+        try:
+            servings = int(servings)
+            if servings < 1:
+                return jsonify({"error": "Ilość porcji musi być >= 1"}), 400
+        except (ValueError, TypeError):
+            return jsonify({"error": "Nieprawidłowa wartość porcji"}), 400
 
     # ============================
     # 3. Połączenie z bazą
@@ -275,13 +369,14 @@ def add_recipe():
     # 4. Zapis przepisu
     # ============================
     cur.execute("""
-        INSERT INTO recipes (user_id, title, description, is_size)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO recipes (user_id, title, description, is_size, number_of_servings)
+        VALUES (?, ?, ?, ?, ?)
     """, (
         user_id,
         title,
         description,
-        1 if size["type"] != "none" else 0
+        1 if size["type"] != "none" else 0,
+        servings
     ))
 
     recipe_id = cur.lastrowid
@@ -362,11 +457,14 @@ def add_recipe():
         full_path = FULL_DIR / unique_name
         thumb_path = THUMB_DIR / unique_name
 
+
+
         # Save original
         photo.save(str(full_path))
-
+        # Normalize original (nadpisz plik)
+        resize_image(str(full_path), str(full_path), (800, 800))
         # Create thumbnail
-        create_thumbnail(str(full_path), str(thumb_path))
+        resize_image(str(full_path), str(thumb_path), (400, 400))
 
         saved_files.append(unique_name)
 
@@ -412,8 +510,10 @@ def get_recipes():
     conn = get_db()
     cur = conn.cursor()
 
+
     rows = cur.execute("""
         SELECT r.id, r.title, r.description, r.rating,
+               r.number_of_servings,
                (SELECT thumb_path FROM recipe_photos WHERE recipe_id = r.id LIMIT 1) AS thumb
         FROM recipes r
         ORDER BY r.created_at DESC
@@ -434,6 +534,7 @@ def get_recipes():
             "description": r["description"],
             "rating": r["rating"],
             "thumb": r["thumb"],
+            "servings": r["number_of_servings"],
             "tags": [t[0] for t in tags]
         })
 
@@ -448,6 +549,7 @@ def get_recipe(recipe_id):
     r = cur.execute("""
         SELECT r.id, r.title, r.description, r.rating,
                r.created_at, r.user_id,
+               r.number_of_servings,
                u.username
         FROM recipes r
         JOIN users u ON u.id = r.user_id
@@ -517,6 +619,7 @@ def get_recipe(recipe_id):
         "id": r["id"],
         "title": r["title"],
         "description": r["description"],
+        "servings": r["number_of_servings"],
         "rating": r["rating"] or 0,
         "author": r["username"],
         "created_at": r["created_at"],

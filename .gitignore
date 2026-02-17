@@ -1,2 +1,5 @@
 .env
 uploads
+clear_db.py
+recipes.db
+uploads/
