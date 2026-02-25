@@ -293,26 +293,29 @@ function addIngredient() {
 
     row.innerHTML = `
         <input type="text" class="ing-name" placeholder="Nazwa składnika">
-
         <input type="number" class="ing-amount" placeholder="Ilość" min="0.1" step="0.1">
-
         <select class="ing-unit">
             <option value="g">g</option>
             <option value="ml">ml</option>
             <option value="szt">szt</option>
         </select>
-
         <button type="button" class="remove-btn" onclick="removeIngredient(this)">Usuń</button>
     `;
 
     container.appendChild(row);
+
+    // automatyczny zapis
+    row.querySelectorAll("input, select").forEach(el => {
+        el.addEventListener("input", saveIngredients);
+    });
+
+    saveIngredients();
 }
 
 function removeIngredient(btn) {
     btn.parentElement.remove();
+    saveIngredients();
 }
-
-
 // --- DODAWANIE KROKÓW ---
 function addStep() {
     const container = document.getElementById("steps");
@@ -328,11 +331,17 @@ function addStep() {
 
     container.appendChild(row);
     renumberSteps();
+
+    // automatyczny zapis
+    row.querySelector(".step-text").addEventListener("input", saveSteps);
+
+    saveSteps();
 }
 
 function removeStep(btn) {
     btn.parentElement.remove();
     renumberSteps();
+    saveSteps();
 }
 
 
@@ -343,6 +352,78 @@ function renumberSteps() {
         label.textContent = (index + 1) + ".";
     });
 }
+
+function autoSaveForm() {
+    document.querySelectorAll("input[name], select[name], textarea[name]").forEach(el => {
+        el.addEventListener("input", () => {
+            if (el.type === "checkbox") {
+                localStorage.setItem(el.name, el.checked);
+            } else {
+                localStorage.setItem(el.name, el.value);
+            }
+        });
+    });
+}
+
+function restoreForm() {
+    document.querySelectorAll("input[name], select[name], textarea[name]").forEach(el => {
+        const saved = localStorage.getItem(el.name);
+        if (saved !== null) {
+            if (el.type === "checkbox") {
+                el.checked = saved === "true";
+            } else {
+                el.value = saved;
+            }
+        }
+    });
+}
+
+function saveIngredients() {
+    const rows = [...document.querySelectorAll(".ingredient-row")];
+    const data = rows.map(row => ({
+        name: row.querySelector(".ing-name").value,
+        amount: row.querySelector(".ing-amount").value,
+        unit: row.querySelector(".ing-unit").value
+    }));
+    localStorage.setItem("ingredients", JSON.stringify(data));
+}
+
+function restoreIngredients() {
+    const saved = localStorage.getItem("ingredients");
+    if (!saved) return;
+
+    const list = JSON.parse(saved);
+    list.forEach(item => {
+        addIngredient();
+        const row = document.querySelector("#ingredients .ingredient-row:last-child");
+        row.querySelector(".ing-name").value = item.name;
+        row.querySelector(".ing-amount").value = item.amount;
+        row.querySelector(".ing-unit").value = item.unit;
+    });
+}
+
+function saveSteps() {
+    const rows = [...document.querySelectorAll(".step-row")];
+    const data = rows.map(row => ({
+        text: row.querySelector(".step-text").value
+    }));
+    localStorage.setItem("steps", JSON.stringify(data));
+}
+
+function restoreSteps() {
+    const saved = localStorage.getItem("steps");
+    if (!saved) return;
+
+    const list = JSON.parse(saved);
+    list.forEach(item => {
+        addStep();
+        const row = document.querySelector("#steps .step-row:last-child");
+        row.querySelector(".step-text").value = item.text;
+    });
+
+    renumberSteps();
+}
+
 
 function validateRecipe() {
     const title = document.getElementById("title").value.trim();
@@ -452,6 +533,51 @@ function validateRecipe() {
             toggle.textContent = "🌙";
         }
     });
+
+document.querySelectorAll("input, select, textarea").forEach(el => {
+  el.addEventListener("input", () => {
+    if (el.type === "checkbox") {
+      localStorage.setItem(el.name, el.checked);
+    } else {
+      localStorage.setItem(el.name, el.value);
+    }
+  });
+});
+
+window.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("input, select, textarea").forEach(el => {
+    const saved = localStorage.getItem(el.name);
+    if (saved !== null) {
+      if (el.type === "checkbox") {
+        el.checked = saved === "true";
+      } else {
+        el.value = saved;
+      }
+    }
+  });
+});
+
+
+
+
+
+
+
+
+
+
+window.addEventListener("DOMContentLoaded", () => {
+    restoreForm();
+    restoreIngredients();
+    restoreSteps();
+    autoSaveForm();
+});
+
+
+
+
+
+
 </script>
 
 

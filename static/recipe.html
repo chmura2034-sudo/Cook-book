@@ -62,9 +62,9 @@
   margin-right: 0;
 }
 .ingredient-name {
-  width: 180px;
+  width: 350px;
   min-width: 120px;
-  max-width: 200px;
+  max-width: 350px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -91,9 +91,9 @@
   flex-shrink: 0;
 }
 .step-text {
-  width: 320px;
+  width: 1500px;
   min-width: 120px;
-  max-width: 400px;
+  max-width: 1500px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -178,7 +178,7 @@ async function loadRecipe() {
           </div>
 
           <h2>Tagi</h2>
-          <div class="tags">${(Array.isArray(r.tags) ? r.tags : []).map(t => `<span>${safe(t)}</span>`).join("")}</div>
+          <div class="tags">${(Array.isArray(r.tags) ? r.tags : []).map(t => `<span>${safe(t)}</span>`).join(" ")}</div>
 
           <h2>Forma</h2>
           <p>${renderVessel(r.size)}</p>
@@ -239,49 +239,57 @@ async function loadRecipe() {
 function scaleIngredients() {
   const mode = document.getElementById("scaling-mode").value;
   let totalFactor = 1;
+
   if (mode === "servings") {
     const servings = parseFloat(document.getElementById("scaling-servings").value) || 1;
-    totalFactor = servings/originalServings;
+    totalFactor = servings / originalServings;
   } else {
     const type = document.getElementById("scaling-type").value;
-    let vesselFactor = 1;
+
+    // --- OBLICZANIE POLA ORYGINALNEJ FORMY ---
+    let originalArea = 1;
+    if (originalSize.type === "round") {
+      const r = (parseFloat(originalSize.diameter) || 1) / 2;
+      originalArea = Math.PI * r * r;
+    } else if (originalSize.type === "rect") {
+      const L = parseFloat(originalSize.length) || 1;
+      const W = parseFloat(originalSize.width) || 1;
+      originalArea = L * W;
+    }
+
+    // --- OBLICZANIE POLA NOWEJ FORMY ---
+    let newArea = 1;
     if (type === "round") {
       const diameter = parseFloat(document.getElementById("scaling-diameter").value) || 1;
-      const origDiameter = originalSize.type === "round" ? parseFloat(originalSize.diameter) || 1 : 1;
-      vesselFactor = Math.pow(diameter/origDiameter, 2);
+      const r = diameter / 2;
+      newArea = Math.PI * r * r;
     } else if (type === "rect") {
       const length = parseFloat(document.getElementById("scaling-length").value) || 1;
       const width = parseFloat(document.getElementById("scaling-width").value) || 1;
-      const origLength = originalSize.type === "rect" ? parseFloat(originalSize.length) || 1 : 1;
-      const origWidth = originalSize.type === "rect" ? parseFloat(originalSize.width) || 1 : 1;
-      vesselFactor = (length*width)/(origLength*origWidth);
+      newArea = length * width;
     }
-    totalFactor = vesselFactor;
+
+    totalFactor = newArea / originalArea;
   }
+
+  // --- AKTUALIZACJA LISTY SKŁADNIKÓW ---
   const ul = document.getElementById("ingredients-list");
   ul.innerHTML = originalIngredients.map((i, idx) => `
     <li class="ingredient-row">
       <span class="ingredient-dot">•</span>
       <span class="ingredient-name">${i.name}</span>
-      <span class="ingredient-amount">${(parseFloat(i.amount)*totalFactor).toFixed(2)}</span>
+      <span class="ingredient-amount">${(parseFloat(i.amount) * totalFactor).toFixed(2)}</span>
       <span class="ingredient-unit">${i.unit || ""}</span>
       <input type="checkbox" class="ing-check checkbox-right" data-idx="${idx}">
     </li>
   `).join("");
+
   document.querySelectorAll(".ing-check").forEach(cb => {
     cb.addEventListener("change", e => {
       const row = e.target.closest(".ingredient-row");
       row.querySelector(".ingredient-name").classList.toggle("checked", e.target.checked);
       row.querySelector(".ingredient-amount").classList.toggle("checked", e.target.checked);
       row.querySelector(".ingredient-unit").classList.toggle("checked", e.target.checked);
-    });
-  });
-
-  // Dodaj obsługę przekreślania kroków
-  document.querySelectorAll(".step-check").forEach(cb => {
-    cb.addEventListener("change", e => {
-      const row = e.target.closest(".step-row");
-      row.querySelector(".step-text").classList.toggle("checked", e.target.checked);
     });
   });
 }
